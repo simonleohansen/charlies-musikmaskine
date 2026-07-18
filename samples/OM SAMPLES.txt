@@ -1,0 +1,15 @@
+Disse lydfiler kommer fra:
+
+1) VSCO-2 Community Edition
+   (Versilian Studios Chamber Orchestra 2, Community Edition)
+   https://github.com/sgossner/VSCO-2-CE
+   Licens: CC0 1.0 Universal (public domain) — må bruges frit.
+   Tak til Sam Gossner & co.!
+
+2) Kor-filerne (choir_*.wav): Sonatina Symphonic Orchestra
+   https://github.com/peastman/sso
+   Licens: Creative Commons Sampling Plus 1.0
+   Tak til Mattias Westlund!
+
+Filerne er konverteret til mono 16-bit 44,1 kHz og trimmet
+(stilhed i starten fjernet, lange haler forkortet med fade).

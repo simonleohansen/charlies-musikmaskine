@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Charlies Musikmaskine 🎛️</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎛️</text></svg>">
+</head>
+<body>
+
+<header id="topbar">
+  <div id="logo">🎛️ <span>Charlies Musikmaskine</span></div>
+  <button id="playBtn" title="Spil / Stop">▶️</button>
+  <div id="tempoBox">
+    <span>🐢</span>
+    <input type="range" id="tempo" min="70" max="150" value="110" step="1">
+    <span>🐇</span>
+    <span id="bpmLabel">110</span>
+  </div>
+  <div id="barBox">
+    <button id="lessBars" title="Færre bars">−</button>
+    <span id="barCount">8 bars</span>
+    <button id="moreBars" title="Flere bars">+</button>
+  </div>
+  <input id="songName" placeholder="Charlies Sang" maxlength="40">
+  <button id="exportBtn">💾 Gem sang</button>
+  <button id="libBtn" title="Charlies sange">📚</button>
+  <button id="newBtn" title="Ny tom sang">🗑️</button>
+</header>
+<div id="songTabs"></div>
+<div id="dancer" hidden>🕺</div>
+<div id="songLib" hidden>
+  <div id="songLibBox">
+    <div id="songLibHead">
+      <span>📚 Charlies Sange</span>
+      <button id="libClose">✖</button>
+    </div>
+    <div id="songCards"></div>
+    <div id="libActions">
+      <button id="libSaveCurrent">💾 Gem denne sang i biblioteket</button>
+      <button id="libNew">➕ Ny tom sang</button>
+      <button id="libRestore" title="Hent alt tilbage fra backup-filen på disken">🛟 Gendan backup</button>
+    </div>
+  </div>
+</div>
+
+<main>
+  <div id="trackHeads"></div>
+  <div id="gridScroll">
+    <div id="gridContent">
+      <div id="barNums"></div>
+      <div id="grid"></div>
+      <div id="playhead"></div>
+    </div>
+  </div>
+</main>
+
+<footer id="bottom">
+  <div id="leftPanel">
+    <div id="tabs">
+      <button class="tab active" data-tab="lib">🎵 Lyde</button>
+      <button class="tab" data-tab="seq">🥁 Trommemaskine</button>
+      <button class="tab" data-tab="snd">🧪 Lydmaskine</button>
+      <button class="tab" data-tab="rec">🎙️ Optag</button>
+      <button class="tab" data-tab="pad">🎹 Spil</button>
+      <button id="eraseBtn" title="Viskelæder – slet fra sporene">🧽 Slet</button>
+    </div>
+    <div id="libPanel" class="panel">
+      <div id="cats"></div>
+      <div id="tiles"></div>
+    </div>
+    <div id="seqPanel" class="panel" hidden>
+      <div id="seqGrid"></div>
+      <div id="seqBtns">
+        <button id="seqLoopBtn">🔁 Kør i ring</button>
+        <button id="seqPlay">▶️ Prøv</button>
+        <button id="seqSave">💾 Gem beat</button>
+        <button id="seqClear">🧹 Ryd</button>
+      </div>
+    </div>
+    <div id="soundPanel" class="panel" hidden>
+      <div id="sndPresets"></div>
+      <div id="sndMain">
+        <div id="sndCtrls">
+          <div id="waveRow">
+            <button class="waveBtn active" data-wave="sine" title="Blød">🌊</button>
+            <button class="waveBtn" data-wave="triangle" title="Rund">🔺</button>
+            <button class="waveBtn" data-wave="square" title="Firkantet">🟦</button>
+            <button class="waveBtn" data-wave="sawtooth" title="Skarp">🦈</button>
+            <button class="waveBtn" data-wave="noise" title="Sus">🌪️</button>
+            <button id="sndRev" title="Baglæns (kun optagelser)">⏪</button>
+            <span id="sndRecSources"></span>
+          </div>
+          <label>🐘🐦 Tone <input id="sndPitch" type="range" min="24" max="84" step="1" value="60"></label>
+          <label>📏 Længde <input id="sndLen" type="range" min="0.08" max="4" step="0.01" value="0.5"></label>
+          <label>💥 Punch <input id="sndPunch" type="range" min="0" max="1" step="0.01" value="0"></label>
+          <label>🎢 Glid <input id="sndSlide" type="range" min="-1" max="1" step="0.01" value="0"></label>
+          <label>🧈 Fed <input id="sndFat" type="range" min="0" max="1" step="0.01" value="0"></label>
+          <label>🎸 Wah <input id="sndWah" type="range" min="0" max="1" step="0.01" value="0"></label>
+          <label>🌀 Wobble <input id="sndWobble" type="range" min="0" max="1" step="0.01" value="0"></label>
+          <label>💡 Lys <input id="sndBright" type="range" min="0" max="1" step="0.01" value="0.7"></label>
+          <label>🏔️ Ekko <input id="sndEcho" type="range" min="0" max="1" step="0.01" value="0"></label>
+          <label>↔️ Balance <input id="sndPan" type="range" min="-1" max="1" step="0.01" value="0"></label>
+          <label>🪶 Blød <input id="sndAttack" type="range" min="0" max="1" step="0.01" value="0"></label>
+          <label>🌌 Rum <input id="sndVerb" type="range" min="0" max="1" step="0.01" value="0"></label>
+          <label>📳 Rysten <input id="sndTrem" type="range" min="0" max="1" step="0.01" value="0"></label>
+          <label>🔥 Vræng <input id="sndDist" type="range" min="0" max="1" step="0.01" value="0"></label>
+        </div>
+        <div id="sndRight">
+          <button id="sndTest">👆 PRØV<br>LYDEN</button>
+          <button id="sndReset">🔄 Nulstil</button>
+          <button id="sndSave">💾 Gem lyd</button>
+        </div>
+      </div>
+    </div>
+    <div id="recPanel" class="panel" hidden>
+      <div id="recBigRow">
+        <button id="recBtn">🎙️ HOLD KNAPPEN NEDE<br>OG SIG NOGET SJOVT</button>
+        <button id="singBtn">🎤 SYNG<br>MED SANGEN</button>
+      </div>
+      <div id="recRow">
+        <div id="recResult" hidden>
+          <span id="recFx">
+            <button class="fxBtn active" data-fx="normal" title="Normal">🙂</button>
+            <button class="fxBtn" data-fx="egern" title="Egern">🐿️</button>
+            <button class="fxBtn" data-fx="kaempe" title="Kæmpe">👹</button>
+            <button class="fxBtn" data-fx="robot" title="Robot">🤖</button>
+          </span>
+          <button id="recPlay">▶️ Hør</button>
+          <button id="recSave">💾 Gem lyden</button>
+          <button id="recRetry">🗑️</button>
+        </div>
+        <div id="recHint">Gemte lyde lander i ⭐ Mine Lyde og i 🥁 Trommemaskinen</div>
+      </div>
+    </div>
+    <div id="padPanel" class="panel" hidden>
+      <div id="padTop">
+        <div id="padInsts"></div>
+        <button id="padRecBtn">🔴 Optag dit spil</button>
+      </div>
+      <div id="padGrid"></div>
+    </div>
+  </div>
+
+  <div id="clipPanel">
+    <div id="clipEmpty">👆 Tryk på en bar i sporene<br>for at skrue på den</div>
+    <div id="clipEdit" hidden>
+      <div id="clipTitle"></div>
+      <div class="knobs">
+        <label>🔊 Volumen <input type="range" id="kVol" min="0" max="1.2" step="0.01"></label>
+        <label>↔️ Balance <input type="range" id="kPan" min="-1" max="1" step="0.01"></label>
+        <label>🌈 Filter <input type="range" id="kFilter" min="0" max="1" step="0.01"></label>
+        <label>👊 Punch <input type="range" id="kComp" min="0" max="1" step="0.01"></label>
+        <label>🌌 Rum <input type="range" id="kVerb" min="0" max="1" step="0.01"></label>
+        <label>🏔️ Ekko <input type="range" id="kEcho" min="0" max="1" step="0.01"></label>
+        <label>🔥 Vræng <input type="range" id="kDist" min="0" max="1" step="0.01"></label>
+        <label>📳 Rysten <input type="range" id="kTrem" min="0" max="1" step="0.01"></label>
+      </div>
+      <div id="taktOctRow">
+        <span id="taktRow" hidden>
+          <span>🎯 Takt:</span>
+          <button class="taktBtn" data-takt="0">1</button>
+          <button class="taktBtn" data-takt="1">2</button>
+          <button class="taktBtn" data-takt="2">3</button>
+          <button class="taktBtn" data-takt="3">4</button>
+          <button class="taktBtn" data-takt="all">🔁 Alle</button>
+        </span>
+        <span id="octRow">
+          <span>🎚️ Oktav:</span>
+          <button class="octBtn" data-oct="-1">🐢 Dyb</button>
+          <button class="octBtn" data-oct="0">🙂</button>
+          <button class="octBtn" data-oct="1">🐦 Lys</button>
+        </span>
+      </div>
+      <div id="autoBox">
+        <div id="autoHead">
+          <span>📈 Automation</span>
+          <button class="autoParam" data-param="vol">🔊</button>
+          <button class="autoParam" data-param="filter">🌈</button>
+          <span id="spanBtns">
+            <button class="spanBtn" data-span="1">1</button>
+            <button class="spanBtn" data-span="2">2</button>
+            <button class="spanBtn" data-span="3">3</button>
+            <button class="spanBtn" data-span="4">4</button>
+          </span>
+          <button id="autoClear" title="Fjern automation">🗑️</button>
+        </div>
+        <canvas id="autoCanvas" width="480" height="110"></canvas>
+      </div>
+      <button id="clipDelete">🧽 Fjern denne bar</button>
+    </div>
+  </div>
+</footer>
+
+<div id="toast" hidden></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
