@@ -838,17 +838,20 @@ export function playCustomSound(ctx, out, t, f, dur, vel, p) {
 }
 
 // planlaeg et loop ind i en node (starttid i sekunder)
-// only: hvis sat (tal eller liste af 0-3) og loopet er 1 takt, spilles kun paa de takter i baren
+// only: hvis sat (tal eller liste af 0-3) spilles kun de valgte takter i baren.
+//   1-takts loops: styrer hvilke gentagelser der spilles.
+//   4-takts loops: "klipper" frasen — kun events der starter i de valgte takter spilles.
 // trans: transponering i halvtoner (barens oktav-vaelger bruger +/-12)
 export function scheduleLoop(ctx, dest, loop, t0, bpm, cellBeats = BEATS_PER_CELL, only = null, trans = 0) {
   const spb = 60 / bpm;
   const loopBeats = loop.takts * 4;
   const reps = Math.max(1, Math.round(cellBeats / loopBeats));
+  const taktOk = takt => (Array.isArray(only) ? only.includes(takt) : takt === only);
   for (let r = 0; r < reps; r++) {
-    if (only != null && loop.takts === 1 && reps > 1) {
-      if (Array.isArray(only) ? !only.includes(r) : r !== only) continue;
-    }
+    if (only != null && loop.takts === 1 && reps > 1 && !taktOk(r)) continue;
     for (const e of loop.events) {
+      if (only != null && loop.takts > 1 && !taktOk(Math.floor(e.t / 4) % 4)) continue;
+      if (r * loopBeats + e.t >= cellBeats) continue; // klip loops der er laengere end feltet
       const t = t0 + (r * loopBeats + e.t) * spb;
       const f = e.midi != null ? midiToFreq(e.midi + trans) : 0;
       if (e.inst === '@custom') {
@@ -887,6 +890,20 @@ function scheduleBarColumn(ctx, trackDests, state, bar, t0) {
   for (let tr = 0; tr < song.trackCount; tr++) {
     const clip = song.cells[tr + ':' + bar];
     if (!clip) continue;
+    // en bar kan vaere DELT i 2 eller 4 stykker, hver med sin egen lyd
+    if (clip.split) {
+      const partBeats = BEATS_PER_CELL / clip.split;
+      const partDur = partBeats * 60 / bpm;
+      clip.parts.forEach((p, i) => {
+        if (!p) return;
+        const loop = p.inline || loopsById[p.loopId];
+        if (!loop) return;
+        const pt = t0 + i * partDur;
+        const input = buildClipChain(ctx, trackDests[tr], p, pt, partDur, null);
+        scheduleLoop(ctx, input, loop, pt, bpm, partBeats, p.takt ?? null, (p.oct || 0) * 12);
+      });
+      continue;
+    }
     // barer kan indeholde et "indbygget" loop (indspillet performance) i stedet for et biblioteks-loop
     const loop = clip.inline || loopsById[clip.loopId];
     if (!loop) continue;
@@ -980,17 +997,17 @@ export class Player {
     this.previewKey = 'loop:' + (loop.id || 'tmp');
     this.previewUntil = ctx.currentTime + 0.03 + beats * 60 / bpm + 0.3;
   }
-  // forsmag paa en placeret bar MED dens egne indstillinger (vol/pan/filter/komp/automation/takt)
-  previewClip(loop, clip, bpm, key = null) {
+  // forsmag paa en placeret bar/stykke MED egne indstillinger
+  previewClip(loop, clip, bpm, key = null, beats = BEATS_PER_CELL) {
     const ctx = this.ensureCtx();
     this._newPreviewBus();
-    const cellDur = BEATS_PER_CELL * 60 / bpm;
+    const cellDur = beats * 60 / bpm;
     const seg = clip.auto?.curve
       ? { param: clip.auto.param || 'vol', curve: clip.auto.curve, from: 0, to: 1 / (clip.auto.span || 1) }
       : null;
     const t0 = ctx.currentTime + 0.03;
     const input = buildClipChain(ctx, this.previewGain, clip, t0, cellDur, seg);
-    scheduleLoop(ctx, input, loop, t0, bpm, BEATS_PER_CELL, clip.takt ?? null, (clip.oct || 0) * 12);
+    scheduleLoop(ctx, input, loop, t0, bpm, beats, clip.takt ?? null, (clip.oct || 0) * 12);
     this.previewKey = key;
     this.previewT0 = t0;
     this.previewDur = cellDur;

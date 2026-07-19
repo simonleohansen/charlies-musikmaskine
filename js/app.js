@@ -293,14 +293,32 @@ function cellEl(tr, bar) {
 function paintCell(cell) {
   const tr = +cell.dataset.tr, bar = +cell.dataset.bar;
   const clip = state.song.cells[tr + ':' + bar];
-  const sel = state.selected && state.selected.tr === tr && state.selected.bar === bar;
-  cell.classList.toggle('selected', !!sel);
+  const selHere = state.selected && state.selected.tr === tr && state.selected.bar === bar;
   if (!clip) {
-    cell.className = 'cell' + (sel ? ' selected' : '');
+    cell.className = 'cell' + (selHere ? ' selected' : '');
     cell.style.background = '';
     cell.innerHTML = '';
     return;
   }
+  // delt bar: 2 eller 4 smaa felter side om side
+  if (clip.split) {
+    cell.className = 'cell splitCell';
+    cell.style.background = '';
+    cell.innerHTML = '';
+    clip.parts.forEach((p, i) => {
+      const s = document.createElement('span');
+      const lp = p ? effLoop(p) : null;
+      s.className = 'part' + (p ? ' filled' : '') + (selHere && state.selected.slot === i ? ' sel' : '');
+      if (p) {
+        s.style.background = lp ? loopColor(lp) : '#888';
+        s.textContent = lp ? lp.emoji : '?';
+        s.title = lp ? lp.name : '';
+      }
+      cell.appendChild(s);
+    });
+    return;
+  }
+  const sel = selHere && state.selected.slot == null;
   const loop = effLoop(clip);
   cell.className = 'cell filled' + (sel ? ' selected' : '');
   cell.style.background = loop ? loopColor(loop) : '#888';
@@ -346,10 +364,11 @@ window.addEventListener('pointermove', e => {
     if (Math.hypot(e.clientX - dragMove.startX, e.clientY - dragMove.startY) < 10) return;
     dragMove.dragging = true;
     const loop = effLoop(dragMove.clip);
+    const isSplit = !!dragMove.clip.split;
     const g = document.createElement('div');
     g.className = 'dragGhost';
-    g.style.background = loop ? loopColor(loop) : '#888';
-    g.innerHTML = `<span class="emo">${loop ? loop.emoji : '🎵'}</span><span class="nm">${loop ? loop.name : ''}</span>`;
+    g.style.background = loop ? loopColor(loop) : (isSplit ? '#4dd6c1' : '#888');
+    g.innerHTML = `<span class="emo">${loop ? loop.emoji : (isSplit ? '✂️' : '🎵')}</span><span class="nm">${loop ? loop.name : (isSplit ? 'Delt bar' : '')}</span>`;
     document.body.appendChild(g);
     dragMove.ghost = g;
     const src = cellEl(dragMove.tr, dragMove.bar);
@@ -425,6 +444,12 @@ window.addEventListener('pointerup', () => {
   stretch = null;
 });
 
+// hvilket stykke i en delt bar blev der trykket paa?
+function slotAt(cell, clientX, split) {
+  const r = cell.getBoundingClientRect();
+  return Math.max(0, Math.min(split - 1, Math.floor((clientX - r.left) / r.width * split)));
+}
+
 gridEl.addEventListener('click', e => {
   if (suppressClick) { suppressClick = false; return; }
   const cell = e.target.closest('.cell');
@@ -432,6 +457,30 @@ gridEl.addEventListener('click', e => {
   const tr = +cell.dataset.tr, bar = +cell.dataset.bar;
   const key = tr + ':' + bar;
   const existing = state.song.cells[key];
+  // delt bar: arbejd paa det enkelte stykke
+  if (existing && existing.split) {
+    const slot = slotAt(cell, e.clientX, existing.split);
+    if (state.tool?.type === 'erase') {
+      if (existing.parts[slot]) {
+        pushHistory();
+        existing.parts[slot] = null;
+        if (existing.parts.every(p => !p)) delete state.song.cells[key];
+        if (state.selected && state.selected.tr === tr && state.selected.bar === bar) selectClip(null, { hear: false });
+        paintCell(cell); persist();
+      }
+      return;
+    }
+    if (existing.parts[slot]) { selectClip({ tr, bar, slot }); return; }
+    if (state.tool?.type === 'loop') {
+      pushHistory();
+      existing.parts[slot] = { loopId: state.tool.id, vol: 0.9, pan: 0, filter: 0.5, comp: 0, auto: null };
+      persist();
+      selectClip({ tr, bar, slot });
+      return;
+    }
+    selectClip(null);
+    return;
+  }
   if (state.tool?.type === 'erase') {
     if (existing) {
       pushHistory();
@@ -524,7 +573,19 @@ document.querySelectorAll('.tab').forEach(tab => {
 // ---------------- clip-panel (volumen/balance/filter/punch + automation) ----------------
 function selectedClip() {
   if (!state.selected) return null;
-  return state.song.cells[state.selected.tr + ':' + state.selected.bar] || null;
+  const v = state.song.cells[state.selected.tr + ':' + state.selected.bar];
+  if (!v) return null;
+  if (v.split) {
+    const s = state.selected.slot;
+    return s == null ? null : (v.parts[s] || null);
+  }
+  return state.selected.slot == null ? v : null;
+}
+// hvor mange slag fylder det valgte (helt felt = 16, halvt = 8, kvart = 4)?
+function selectedBeats() {
+  if (!state.selected) return BEATS_PER_CELL;
+  const v = state.song.cells[state.selected.tr + ':' + state.selected.bar];
+  return v?.split ? BEATS_PER_CELL / v.split : BEATS_PER_CELL;
 }
 
 function selectClip(sel, { hear = true } = {}) {
@@ -533,16 +594,16 @@ function selectClip(sel, { hear = true } = {}) {
   if (prev) { const c = cellEl(prev.tr, prev.bar); if (c) paintCell(c); }
   if (sel) { const c = cellEl(sel.tr, sel.bar); if (c) paintCell(c); }
   renderClipPanel();
-  // hoer baren med dens egne indstillinger (kun naar sangen ikke spiller).
-  // trykker man paa den samme bar mens den spiller, stopper den i stedet
+  // hoer baren/stykket med egne indstillinger (kun naar sangen ikke spiller).
+  // trykker man paa det samme igen mens det spiller, stopper det i stedet
   if (hear && sel && !player.playing) {
     const clip = selectedClip();
     const loop = clip && effLoop(clip);
-    const key = 'clip:' + sel.tr + ':' + sel.bar;
+    const key = 'clip:' + sel.tr + ':' + sel.bar + (sel.slot != null ? ':' + sel.slot : '');
     if (player.isPreviewing(key)) {
       player.stopPreview();
     } else if (loop) {
-      player.previewClip(loop, clip, state.bpm, key);
+      player.previewClip(loop, clip, state.bpm, key, selectedBeats());
     }
   }
 }
@@ -553,11 +614,14 @@ function renderClipPanel() {
   $('clipEdit').hidden = !clip;
   if (!clip) return;
   const loop = effLoop(clip);
-  $('clipTitle').innerHTML = `${loop ? loop.emoji + ' ' + loop.name : '?'} <small>· Bar ${state.selected.bar + 1} · Spor ${state.selected.tr + 1}</small>`;
-  // takt-vaelger vises kun for 1-takts loops; flere takter kan vaelges samtidig
-  const isOneTakt = loop && loop.takts === 1;
-  $('taktRow').hidden = !isOneTakt;
-  if (isOneTakt) {
+  const isPart = state.selected.slot != null;
+  const partTxt = isPart ? ` · Stykke ${state.selected.slot + 1}` : '';
+  $('clipTitle').innerHTML = `${loop ? loop.emoji + ' ' + loop.name : '?'} <small>· Bar ${state.selected.bar + 1} · Spor ${state.selected.tr + 1}${partTxt}</small>`;
+  // takt-vaelger kun for 1-takts loops i hele barer; automation kun for hele barer
+  $('autoBox').hidden = isPart;
+  $('clipDelete').textContent = isPart ? '🧽 Fjern dette stykke' : '🧽 Fjern denne bar';
+  $('taktRow').hidden = !loop || isPart || loop.takts !== 1;
+  if (loop && !isPart && loop.takts === 1) {
     const cur = clip.takt;
     document.querySelectorAll('.taktBtn').forEach(b => {
       if (b.dataset.takt === 'all') {
@@ -630,15 +694,24 @@ document.querySelectorAll('.octBtn').forEach(b => {
   };
 });
 
-$('clipDelete').onclick = () => {
+function deleteSelected() {
   if (!state.selected) return;
+  const { tr, bar, slot } = state.selected;
+  const key = tr + ':' + bar;
+  const v = state.song.cells[key];
   pushHistory();
-  delete state.song.cells[state.selected.tr + ':' + state.selected.bar];
-  const c = cellEl(state.selected.tr, state.selected.bar);
-  selectClip(null);
+  if (v && v.split && slot != null) {
+    v.parts[slot] = null;
+    if (v.parts.every(p => !p)) delete state.song.cells[key];
+  } else {
+    delete state.song.cells[key];
+  }
+  const c = cellEl(tr, bar);
+  selectClip(null, { hear: false });
   if (c) paintCell(c);
   persist();
-};
+}
+$('clipDelete').onclick = deleteSelected;
 
 // automation
 document.querySelectorAll('.autoParam').forEach(b => {
@@ -973,7 +1046,7 @@ window.addEventListener('keydown', e => { if (e.key === 'Escape') hideMenu(); })
 // ingen browser-menu inde i appen (undtagen i tekstfelter)
 window.addEventListener('contextmenu', e => { if (!e.target.closest('input,textarea')) e.preventDefault(); });
 
-let clipboard = null; // kopieret bar (med alle indstillinger)
+let clipboard = null; // kopieret bar/stykke (med alle indstillinger)
 
 function pasteInto(tr, bar) {
   if (!clipboard) return;
@@ -983,6 +1056,41 @@ function pasteInto(tr, bar) {
   selectClip({ tr, bar });
 }
 
+// del en bar op i n stykker (eksisterende indhold ryger i foerste stykke),
+// eller omfordel hvis den allerede er delt
+function splitCell(tr, bar, n) {
+  pushHistory();
+  const key = tr + ':' + bar;
+  const v = state.song.cells[key];
+  const parts = new Array(n).fill(null);
+  if (v && !v.split) {
+    parts[0] = v;
+  } else if (v && v.split) {
+    v.parts.forEach((p, i) => {
+      if (!p) return;
+      const idx = Math.min(n - 1, Math.floor(i * n / v.split));
+      if (!parts[idx]) parts[idx] = p;
+    });
+  }
+  state.song.cells[key] = { split: n, parts };
+  if (state.selected && state.selected.tr === tr && state.selected.bar === bar) selectClip(null, { hear: false });
+  paintCell(cellEl(tr, bar));
+  persist();
+}
+// saml en delt bar igen (foerste stykke bliver hele baren)
+function mergeCell(tr, bar) {
+  const key = tr + ':' + bar;
+  const v = state.song.cells[key];
+  if (!v || !v.split) return;
+  pushHistory();
+  const first = v.parts.find(p => p);
+  if (first) state.song.cells[key] = first;
+  else delete state.song.cells[key];
+  if (state.selected && state.selected.tr === tr && state.selected.bar === bar) selectClip(null, { hear: false });
+  paintCell(cellEl(tr, bar));
+  persist();
+}
+
 gridEl.addEventListener('contextmenu', e => {
   const cell = e.target.closest('.cell');
   if (!cell) return;
@@ -990,6 +1098,38 @@ gridEl.addEventListener('contextmenu', e => {
   const key = tr + ':' + bar;
   const clip = state.song.cells[key];
   const items = [];
+  // delt bar: menu for det stykke der blev hoejreklikket paa
+  if (clip && clip.split) {
+    const slot = slotAt(cell, e.clientX, clip.split);
+    const part = clip.parts[slot];
+    if (part) {
+      const loop = effLoop(part);
+      items.push({ emoji: '🔊', label: 'Hør stykket', action: () => selectClip({ tr, bar, slot }) });
+      items.push({ emoji: '📋', label: 'Kopiér stykket', action: () => {
+        clipboard = JSON.parse(JSON.stringify(part));
+        toast(`📋 Kopieret: ${loop ? loop.name : 'stykke'}`);
+      } });
+      items.push({ emoji: '🧽', label: 'Slet stykket', danger: true, action: () => {
+        pushHistory();
+        clip.parts[slot] = null;
+        if (clip.parts.every(p => !p)) delete state.song.cells[key];
+        if (state.selected && state.selected.tr === tr && state.selected.bar === bar) selectClip(null, { hear: false });
+        paintCell(cell); persist();
+      } });
+    } else if (clipboard && !clipboard.split) {
+      items.push({ emoji: '📌', label: 'Sæt ind her', action: () => {
+        pushHistory();
+        clip.parts[slot] = JSON.parse(JSON.stringify(clipboard));
+        persist();
+        selectClip({ tr, bar, slot });
+      } });
+    }
+    if (clip.split === 2) items.push({ emoji: '✂️', label: 'Del i 4 i stedet', action: () => splitCell(tr, bar, 4) });
+    if (clip.split === 4) items.push({ emoji: '✂️', label: 'Del i 2 i stedet', action: () => splitCell(tr, bar, 2) });
+    items.push({ emoji: '🔗', label: 'Saml baren igen', action: () => mergeCell(tr, bar) });
+    showMenu(items, e.clientX, e.clientY);
+    return;
+  }
   if (clip) {
     const loop = effLoop(clip);
     items.push({ emoji: '🔊', label: 'Hør baren', action: () => selectClip({ tr, bar }) });
@@ -1001,14 +1141,18 @@ gridEl.addEventListener('contextmenu', e => {
     if (clip.auto) items.push({ emoji: '📈', label: 'Fjern automation', action: () => {
       pushHistory(); clip.auto = null; persist(); paintCell(cell); renderClipPanel();
     } });
+    items.push({ emoji: '✂️', label: 'Del baren i 2', action: () => splitCell(tr, bar, 2) });
+    items.push({ emoji: '✂️', label: 'Del baren i 4', action: () => splitCell(tr, bar, 4) });
     items.push({ emoji: '🧽', label: 'Slet', danger: true, action: () => {
       pushHistory();
       delete state.song.cells[key];
       if (state.selected && state.selected.tr === tr && state.selected.bar === bar) selectClip(null, { hear: false });
       paintCell(cell); persist();
     } });
-  } else if (clipboard) {
-    items.push({ emoji: '📌', label: 'Sæt ind', action: () => pasteInto(tr, bar) });
+  } else {
+    if (clipboard) items.push({ emoji: '📌', label: 'Sæt ind', action: () => pasteInto(tr, bar) });
+    items.push({ emoji: '✂️', label: 'Del baren i 2', action: () => splitCell(tr, bar, 2) });
+    items.push({ emoji: '✂️', label: 'Del baren i 4', action: () => splitCell(tr, bar, 4) });
   }
   showMenu(items, e.clientX, e.clientY);
 });
@@ -1026,7 +1170,10 @@ function renameCustom(loop) {
   toast('✏️ Omdøbt til ' + loop.name);
 }
 function deleteCustom(loop) {
-  const used = Object.keys(state.song.cells).filter(k => state.song.cells[k].loopId === loop.id);
+  const used = Object.keys(state.song.cells).filter(k => {
+    const v = state.song.cells[k];
+    return v.loopId === loop.id || (v.split && v.parts.some(p => p && p.loopId === loop.id));
+  });
   let extra = used.length ? ` Den bruges i ${used.length} bar${used.length > 1 ? 's' : ''}, som også slettes.` : '';
   if (loop.rec) {
     const soundsUsing = customLoops.filter(l => l.sound?.src === loop.rec).length;
@@ -1634,18 +1781,11 @@ barNumsEl.addEventListener('click', e => {
 });
 window.addEventListener('keydown', e => {
   if (e.code === 'Space' && e.target.tagName !== 'INPUT') { e.preventDefault(); togglePlay(); }
-  // Delete/Backspace sletter den valgte bar
+  // Delete/Backspace sletter den valgte bar / det valgte stykke
   if ((e.key === 'Delete' || e.key === 'Backspace') && e.target.tagName !== 'INPUT') {
-    const clip = selectedClip();
-    if (!clip) return;
+    if (!selectedClip()) return;
     e.preventDefault();
-    const { tr, bar } = state.selected;
-    pushHistory();
-    delete state.song.cells[tr + ':' + bar];
-    selectClip(null, { hear: false });
-    const c = cellEl(tr, bar);
-    if (c) paintCell(c);
-    persist();
+    deleteSelected();
     toast('🧽 Slettet — Ctrl+Z fortryder');
   }
 });
