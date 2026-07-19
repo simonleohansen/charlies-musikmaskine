@@ -157,17 +157,30 @@ main { flex: 1 1 auto; display: flex; min-height: 0; }
 .cell .nm { font-size: 10px; font-weight: 700; color: #10131a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cell .autoBadge { position: absolute; right: 3px; top: 1px; font-size: 9px; }
 .cell.selected { outline: 3px solid #fff; outline-offset: -3px; }
-/* delt bar: 2/4 stykker i eet felt */
-.cell.splitCell { display: flex; gap: 2px; padding: 1px; margin: 1px; border-bottom: none; }
+/* delt bar: 2/4 stykker i eet felt — tydeligt markeret med stiplede felter + ✂️ */
+.cell.splitCell {
+  display: flex; gap: 2px; padding: 2px; margin: 1px;
+  border-bottom: none;
+  background: #1a1e26;
+  border-radius: 8px;
+}
 .cell.splitCell .part {
   flex: 1; min-width: 0;
   display: flex; align-items: center; justify-content: center;
-  border-radius: 6px;
-  background: #272c36;
+  border-radius: 5px;
+  background: #232833;
+  border: 1.5px dashed #55607a;
   font-size: 13px;
   overflow: hidden;
 }
+.cell.splitCell .part.filled { border: 1.5px solid transparent; }
 .cell.splitCell .part.sel { outline: 2px solid #fff; outline-offset: -2px; }
+.splitBadge {
+  position: absolute; top: -1px; right: 2px;
+  font-size: 9px; line-height: 1;
+  pointer-events: none; z-index: 1;
+  filter: drop-shadow(0 1px 2px #000);
+}
 #playhead {
   position: absolute; top: 0; bottom: 0; width: 3px;
   background: var(--accent);

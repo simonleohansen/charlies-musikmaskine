@@ -300,11 +300,11 @@ function paintCell(cell) {
     cell.innerHTML = '';
     return;
   }
-  // delt bar: 2 eller 4 smaa felter side om side
+  // delt bar: 2 eller 4 smaa felter side om side + synligt ✂️-maerke
   if (clip.split) {
     cell.className = 'cell splitCell';
     cell.style.background = '';
-    cell.innerHTML = '';
+    cell.innerHTML = '<span class="splitBadge">✂️</span>';
     clip.parts.forEach((p, i) => {
       const s = document.createElement('span');
       const lp = p ? effLoop(p) : null;
