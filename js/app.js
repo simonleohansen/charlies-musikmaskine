@@ -555,15 +555,21 @@ function renderTiles() {
     t.className = 'tile' + (state.tool?.type === 'loop' && state.tool.id === loop.id ? ' active' : '');
     t.dataset.loopId = loop.id;
     t.style.background = loopColor(loop);
-    t.innerHTML = `<span class="emo">${loop.emoji}</span><span class="nm">${loop.name}</span><span class="len">${loop.takts === 1 ? '1 takt' : '4 takter'}</span>`;
-    t.onclick = () => {
+    t.innerHTML = `<span class="playBtn" title="Hør lyden">▶</span><span class="emo">${loop.emoji}</span><span class="nm">${loop.name}</span><span class="len">${loop.takts === 1 ? '1 takt' : '4 takter'}</span>`;
+    t.onclick = e => {
+      // ▶-ikonet afspiller smagsproeven (tryk igen = stop) uden at aendre vaerktoejet
+      if (e.target.closest('.playBtn')) {
+        const key = 'loop:' + loop.id;
+        if (player.isPreviewing(key)) player.stopPreview();
+        else player.preview(loop, state.bpm);
+        return;
+      }
+      // alm. klik vaelger/fravaelger vaerktoejet — stille
       if (state.tool?.type === 'loop' && state.tool.id === loop.id) {
-        // andet tryk: stop forsmagen og laeg vaerktoejet fra sig
         state.tool = null;
         player.stopPreview();
       } else {
         state.tool = { type: 'loop', id: loop.id };
-        player.preview(loop, state.bpm);
       }
       renderTiles(); renderEraseBtn();
     };
