@@ -154,6 +154,20 @@ main { flex: 1 1 auto; display: flex; min-height: 0; }
 .cell:hover { background: #ffffff10; }
 .cell.filled { border-radius: 8px; margin: 1px; border-bottom: none; }
 .cell .emo { font-size: 15px; }
+.cell .playBtn {
+  flex: 0 0 auto;
+  width: 15px; height: 15px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: #00000066;
+  color: #fff;
+  font-size: 8px; line-height: 1;
+  cursor: pointer;
+}
+.cell .playBtn:hover { background: #000000aa; transform: scale(1.2); }
+.cell.splitCell .part .playBtn { position: absolute; margin: 0; }
+.cell.splitCell .part { position: relative; }
+.cell.splitCell .part .playBtn { left: 2px; top: 50%; transform: translateY(-50%); }
 .cell .nm { font-size: 10px; font-weight: 700; color: #10131a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cell .autoBadge { position: absolute; right: 3px; top: 1px; font-size: 9px; }
 .cell.selected { outline: 3px solid #fff; outline-offset: -3px; }

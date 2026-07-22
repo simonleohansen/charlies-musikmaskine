@@ -311,7 +311,8 @@ function paintCell(cell) {
       s.className = 'part' + (p ? ' filled' : '') + (selHere && state.selected.slot === i ? ' sel' : '');
       if (p) {
         s.style.background = lp ? loopColor(lp) : '#888';
-        s.textContent = lp ? lp.emoji : '?';
+        const isSel = selHere && state.selected.slot === i;
+        s.innerHTML = (isSel ? '<span class="playBtn">▶</span>' : '') + (lp ? lp.emoji : '?');
         s.title = lp ? lp.name : '';
       }
       cell.appendChild(s);
@@ -326,7 +327,7 @@ function paintCell(cell) {
     ? `<span class="taktBadge">takt ${(Array.isArray(clip.takt) ? clip.takt : [clip.takt]).map(x => x + 1).join('+')}</span>`
     : '';
   cell.innerHTML = loop
-    ? `<span class="emo">${loop.emoji}</span><span class="nm">${loop.name}</span>${clip.auto ? '<span class="autoBadge">📈</span>' : ''}${taktBadge}`
+    ? `<span class="playBtn" title="Afspil">▶</span><span class="emo">${loop.emoji}</span><span class="nm">${loop.name}</span>${clip.auto ? '<span class="autoBadge">📈</span>' : ''}${taktBadge}`
     : '';
 }
 
@@ -470,7 +471,11 @@ gridEl.addEventListener('click', e => {
       }
       return;
     }
-    if (existing.parts[slot]) { selectClip({ tr, bar, slot }); return; }
+    if (existing.parts[slot]) {
+      // kun ▶-ikonet afspiller — alm. klik vaelger bare
+      selectClip({ tr, bar, slot }, { hear: !!e.target.closest('.playBtn') });
+      return;
+    }
     if (state.tool?.type === 'loop') {
       pushHistory();
       existing.parts[slot] = { loopId: state.tool.id, vol: 0.9, pan: 0, filter: 0.5, comp: 0, auto: null };
@@ -490,10 +495,11 @@ gridEl.addEventListener('click', e => {
     }
     return;
   }
-  // et fyldt felt bliver ALDRIG erstattet ved tryk — det vaelges og hoeres bare.
-  // nye lyde kan kun laegges i tomme felter (slet foerst hvis lyden skal skiftes)
+  // et fyldt felt bliver ALDRIG erstattet ved tryk — det vaelges bare.
+  // afspilning sker via ▶-ikonet eller dobbeltklik, saa lyde ikke spiller
+  // oveni hinanden ved et uheld
   if (existing) {
-    selectClip({ tr, bar });
+    selectClip({ tr, bar }, { hear: !!e.target.closest('.playBtn') });
     return;
   }
   if (state.tool?.type === 'loop') {
@@ -508,6 +514,21 @@ gridEl.addEventListener('click', e => {
     return;
   }
   selectClip(null);
+});
+
+// dobbeltklik paa en fyldt bar / et stykke afspiller det
+gridEl.addEventListener('dblclick', e => {
+  const cell = e.target.closest('.cell');
+  if (!cell) return;
+  const tr = +cell.dataset.tr, bar = +cell.dataset.bar;
+  const v = state.song.cells[tr + ':' + bar];
+  if (!v) return;
+  const sel = { tr, bar };
+  if (v.split) {
+    sel.slot = slotAt(cell, e.clientX, v.split);
+    if (!v.parts[sel.slot]) return;
+  }
+  selectClip(sel, { hear: true });
 });
 
 // ---------------- kategorier & fliser ----------------
@@ -588,7 +609,7 @@ function selectedBeats() {
   return v?.split ? BEATS_PER_CELL / v.split : BEATS_PER_CELL;
 }
 
-function selectClip(sel, { hear = true } = {}) {
+function selectClip(sel, { hear = false } = {}) {
   const prev = state.selected;
   state.selected = sel;
   if (prev) { const c = cellEl(prev.tr, prev.bar); if (c) paintCell(c); }
@@ -1104,7 +1125,7 @@ gridEl.addEventListener('contextmenu', e => {
     const part = clip.parts[slot];
     if (part) {
       const loop = effLoop(part);
-      items.push({ emoji: '🔊', label: 'Hør stykket', action: () => selectClip({ tr, bar, slot }) });
+      items.push({ emoji: '🔊', label: 'Hør stykket', action: () => selectClip({ tr, bar, slot }, { hear: true }) });
       items.push({ emoji: '📋', label: 'Kopiér stykket', action: () => {
         clipboard = JSON.parse(JSON.stringify(part));
         toast(`📋 Kopieret: ${loop ? loop.name : 'stykke'}`);
@@ -1132,7 +1153,7 @@ gridEl.addEventListener('contextmenu', e => {
   }
   if (clip) {
     const loop = effLoop(clip);
-    items.push({ emoji: '🔊', label: 'Hør baren', action: () => selectClip({ tr, bar }) });
+    items.push({ emoji: '🔊', label: 'Hør baren', action: () => selectClip({ tr, bar }, { hear: true }) });
     items.push({ emoji: '📋', label: 'Kopiér', action: () => {
       clipboard = JSON.parse(JSON.stringify(clip));
       toast(`📋 Kopieret: ${loop ? loop.name : 'bar'}`);
